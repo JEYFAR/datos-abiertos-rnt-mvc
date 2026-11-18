@@ -1,0 +1,15 @@
+# Entorno virtual
+venv/
+.venv/
+
+# Variables de entorno locales (NO subir credenciales)
+.env
+
+# Archivos temporales de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE
+.vscode/
+.idea/

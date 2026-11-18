@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consulta de Datos Abiertos - Registro Nacional de Turismo (RNT)</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='estilos.css') }}">
+</head>
+<body>
+    <header class="encabezado">
+        <div class="encabezado-contenido">
+            <div>
+                <h1>Sistema de Consulta de Datos Abiertos de Colombia</h1>
+                <p>Dataset: Registro Nacional de Turismo (RNT) &middot; Fuente oficial: datos.gov.co (ID: thwd-ivmp)</p>
+            </div>
+            <form action="{{ url_for('sincronizar') }}" method="POST">
+                <button type="submit" class="btn btn-sincronizar">
+                    Consultar API y guardar datos
+                </button>
+            </form>
+        </div>
+    </header>
+
+    <main class="contenedor">
+        {% with mensajes = get_flashed_messages(with_categories=true) %}
+            {% for categoria, mensaje in mensajes %}
+                <div class="alerta alerta-{{ categoria }}" role="status">
+                    <strong>{{ 'Éxito' if categoria == 'success' else 'Error' }}:</strong>
+                    {{ mensaje }}
+                </div>
+            {% endfor %}
+        {% endwith %}
+
+        <!-- Resumen numérico básico calculado en SQL Server -->
+        <section class="resumen-grid" aria-label="Resumen numérico de registros">
+            <article class="tarjeta-metrica">
+                <div class="etiqueta">Prestadores almacenados</div>
+                <div class="valor">{{ resumen.total_registros }}</div>
+                <div class="detalle">
+                    {{ 'Con filtro aplicado' if filtro else 'Total en SQL Server' }}
+                </div>
+            </article>
+
+            <article class="tarjeta-metrica">
+                <div class="etiqueta">Municipios cubiertos</div>
+                <div class="valor">{{ resumen.municipios_distintos }}</div>
+                <div class="detalle">
+                    En {{ resumen.departamentos_distintos }} departamento(s)
+                </div>
+            </article>
+
+            <article class="tarjeta-metrica">
+                <div class="etiqueta">Total empleados reportados</div>
+                <div class="valor">{{ resumen.total_empleados }}</div>
+                <div class="detalle">
+                    Promedio: {{ resumen.promedio_empleados }} por prestador
+                </div>
+            </article>
+
+            <article class="tarjeta-metrica">
+                <div class="etiqueta">Capacidad hotelera</div>
+                <div class="valor">{{ resumen.total_habitaciones }}</div>
+                <div class="detalle">
+                    Habitaciones ({{ resumen.total_camas }} camas)
+                </div>
+            </article>
+        </section>
+
+        <section class="panel">
+            <div class="panel-cabecera">
+                <h2>Registros almacenados en SQL Server</h2>
+                <form action="{{ url_for('inicio') }}" method="GET" class="form-busqueda">
+                    <input
+                        type="text"
+                        name="q"
+                        value="{{ filtro }}"
+                        placeholder="Buscar por municipio, depto, categoría o nombre..."
+                        aria-label="Buscar registros"
+                    >
+                    <button type="submit" class="btn btn-primario">Buscar</button>
+                    <a href="{{ url_for('inicio') }}" class="btn btn-secundario">Limpiar</a>
+                </form>
+            </div>
+
+            {% if filtro %}
+                <p class="info-filtro">
+                    Mostrando resultados para <strong>"{{ filtro }}"</strong>
+                    ({{ registros|length }} registro(s) en pantalla).
+                </p>
+            {% else %}
+                <p class="info-filtro">
+                    Mostrando hasta los últimos 100 registros almacenados en la tabla
+                    <code>dbo.RegistrosRNT</code>.
+                </p>
+            {% endif %}
+
+            <div class="tabla-contenedor">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Código RNT</th>
+                            <th>Establecimiento</th>
+                            <th>Departamento</th>
+                            <th>Municipio</th>
+                            <th>Categoría</th>
+                            <th>Estado</th>
+                            <th class="num">Hab.</th>
+                            <th class="num">Camas</th>
+                            <th class="num">Empleados</th>
+                            <th>Periodo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for fila in registros %}
+                            <tr>
+                                <td><code>{{ fila.codigo_rnt }}</code></td>
+                                <td>{{ fila.razon_social or 'Sin dato' }}</td>
+                                <td>{{ fila.departamento or 'Sin dato' }}</td>
+                                <td>{{ fila.municipio or 'Sin dato' }}</td>
+                                <td>{{ fila.categoria or 'Sin dato' }}</td>
+                                <td>
+                                    <span class="badge {{ 'badge-activo' if fila.estado_rnt == 'ACTIVO' else 'badge-otro' }}">
+                                        {{ fila.estado_rnt or 'N/D' }}
+                                    </span>
+                                </td>
+                                <td class="num">{{ fila.habitaciones }}</td>
+                                <td class="num">{{ fila.camas }}</td>
+                                <td class="num">{{ fila.empleados }}</td>
+                                <td>{{ fila.periodo_reporte or 'N/D' }}</td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="10" class="sin-datos">
+                                    No hay registros para mostrar.
+                                    {% if filtro %}
+                                        Prueba con otro término o haz clic en <strong>Limpiar</strong>.
+                                    {% else %}
+                                        Pulsa <strong>"Consultar API y guardar datos"</strong> para sincronizar desde datos.gov.co.
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <footer class="pie">
+        <span>Asignatura: Desarrollo de Aplicaciones con Acceso a Datos &middot; Arquitectura MVC (Flask + SQL Server)</span>
+        <span>
+            Fuente:
+            <a href="https://www.datos.gov.co/d/thwd-ivmp" target="_blank" rel="noopener noreferrer">
+                datos.gov.co/d/thwd-ivmp
+            </a>
+        </span>
+    </footer>
+</body>
+</html>
